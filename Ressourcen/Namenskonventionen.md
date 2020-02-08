@@ -60,13 +60,13 @@ ___
 ### Resource
 
 ```html
-[<corporation>-]<product>-<resource>[-<identifier>][-<env>]
+[<corporation>-]<product>-<resource>[-<identifier>][-<instance>][-<env>]
 ```
 
 * **corporation:** *(optional)* Unternehmen.
 * **product:** Produkt, Lösung, Service oder Plattform.
 * **resource:** Bezeichnung der Resource in Azure.
-* **identifier:** Name der Ressource.
+* **identifier:** *(optional)* Name der Ressource.
 * **instance:** *(optional)* prod/demo/test
 * **env:** *(optional)* prod/demo/test
 
