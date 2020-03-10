@@ -39,7 +39,7 @@ resource "azurerm_public_ip" "anynodepublicip" {
     name                         = "${var.project}-pip-${var.environment}"
     location                     = "${var.location}"
     resource_group_name          = azurerm_resource_group.anynodegroup.name
-    allocation_method            = "Dynamic"
+    allocation_method            = "Static"
 
     tags = {
         environment = var.tag
@@ -171,12 +171,9 @@ resource "azurerm_virtual_machine" "anynodevm" {
             password = "${var.password}"
             host     = azurerm_public_ip.anynodepublicip.ip_address
         }
-
-
         inline = [
             "wget https://linux.te-systems.de/anynode_debian_install.bash",
-            "source ./anynode_debian_install.bash eth0",
+            "echo ${var.password} | sudo -S source ./anynode_debian_install.bash eth0",
         ]
     }
-
 }
