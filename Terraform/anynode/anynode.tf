@@ -1,15 +1,15 @@
 provider "azurerm" {
     version = "=2.0.0"
-    subscription_id = var.subscriptionId
-    client_id       = var.clientId
-    client_secret   = var.clientSecret
-    tenant_id       = var.tenantId
+    subscription_id =  var.subscriptionId
+    client_id       =  var.clientId
+    client_secret   =  var.clientSecret
+    tenant_id       =  var.tenantId
     features {}
 }
 
 resource "azurerm_resource_group" "anynodegroup" {
     name     = "${var.customer}-${var.project}-rg-${var.environment}"
-    location = "${var.location}"
+    location = var.location
 
     tags = {
         environment = var.tag
@@ -19,7 +19,7 @@ resource "azurerm_resource_group" "anynodegroup" {
 resource "azurerm_virtual_network" "anynodenetwork" {
     name                = "${var.project}-vnet-${var.environment}"
     address_space       = ["10.0.0.0/16"]
-    location            = "${var.location}"
+    location            = var.location
     resource_group_name = azurerm_resource_group.anynodegroup.name
 
     tags = {
@@ -37,7 +37,7 @@ resource "azurerm_subnet" "anynodesubnet" {
 
 resource "azurerm_public_ip" "anynodepublicip" {
     name                         = "${var.project}-pip-${var.environment}"
-    location                     = "${var.location}"
+    location                     = var.location
     resource_group_name          = azurerm_resource_group.anynodegroup.name
     allocation_method            = "Static"
 
@@ -48,7 +48,7 @@ resource "azurerm_public_ip" "anynodepublicip" {
 
 resource "azurerm_network_security_group" "anynodensg" {
     name                = "${var.project}-nsg-${var.environment}"
-    location            = "${var.location}"
+    location            = var.location
     resource_group_name = azurerm_resource_group.anynodegroup.name
     
     security_rule {
@@ -64,8 +64,20 @@ resource "azurerm_network_security_group" "anynodensg" {
     }
 
     security_rule {
-        name                       = "HTTPS"
+        name                       = "SIP"
         priority                   = 1002
+        direction                  = "Inbound"
+        access                     = "Allow"
+        protocol                   = "*"
+        source_port_range          = "*"
+        destination_port_range     = "5060-5070"
+        source_address_prefix      = "*"
+        destination_address_prefix = "*"
+    }
+
+    security_rule {
+        name                       = "HTTPS"
+        priority                   = 1003
         direction                  = "Inbound"
         access                     = "Allow"
         protocol                   = "Tcp"
@@ -88,15 +100,15 @@ resource "azurerm_subnet_network_security_group_association" "association" {
 
 resource "azurerm_network_interface" "anynodenic" {
     name                        = "${var.project}-nic-${var.environment}"
-    location                    = "${var.location}"
+    location                    = var.location
     resource_group_name         = azurerm_resource_group.anynodegroup.name
 
 
     ip_configuration {
         name                          = "anynodeNicConfiguration"
-        subnet_id                     = "${azurerm_subnet.anynodesubnet.id}"
+        subnet_id                     = azurerm_subnet.anynodesubnet.id
         private_ip_address_allocation = "Dynamic"
-        public_ip_address_id          = "${azurerm_public_ip.anynodepublicip.id}"
+        public_ip_address_id          = azurerm_public_ip.anynodepublicip.id
     }
 
     tags = {
@@ -115,7 +127,7 @@ resource "random_id" "randomId" {
 resource "azurerm_storage_account" "anynodestorageaccount" {
     name                        = "diag${random_id.randomId.hex}"
     resource_group_name         = azurerm_resource_group.anynodegroup.name
-    location                    = "${var.location}"
+    location                    = var.location
     account_replication_type    = "LRS"
     account_tier                = "Standard"
 
@@ -126,13 +138,13 @@ resource "azurerm_storage_account" "anynodestorageaccount" {
 
 resource "azurerm_virtual_machine" "anynodevm" {
     name                  = "${var.project}-vm-${var.environment}"
-    location              = "${var.location}"
+    location              = var.location
     resource_group_name   = azurerm_resource_group.anynodegroup.name
     network_interface_ids = [azurerm_network_interface.anynodenic.id]
-    vm_size               = "Standard_DS1_v2"
+    vm_size               = var.vmSize
 
     storage_os_disk {
-        name              = "${var.project}OsDisk"
+        name              = "${var.project}-osdisk-${var.environment}"
         caching           = "ReadWrite"
         create_option     = "FromImage"
         managed_disk_type = "Premium_LRS"
@@ -147,8 +159,8 @@ resource "azurerm_virtual_machine" "anynodevm" {
 
     os_profile {
         computer_name  = "${var.project}vm"
-        admin_username = "${var.user}"
-        admin_password = "${var.password}"
+        admin_username = var.user
+        admin_password = var.password
     }
 
     os_profile_linux_config {
@@ -164,16 +176,18 @@ resource "azurerm_virtual_machine" "anynodevm" {
         environment = var.tag
     }
 
-    provisioner "remote-exec" {
+   provisioner "remote-exec" {
         connection {
             type     = "ssh"
-            user     = "${var.user}"
-            password = "${var.password}"
+            user     = var.user
+            password = var.password
             host     = azurerm_public_ip.anynodepublicip.ip_address
         }
         inline = [
             "wget https://linux.te-systems.de/anynode_debian_install.bash",
-            "echo ${var.password} | sudo -S source ./anynode_debian_install.bash eth0",
+            "echo ${var.password} | sudo -S chmod +x anynode_debian_install.bash",
+            "sudo ./anynode_debian_install.bash eth0",
         ]
     }
 }
+
